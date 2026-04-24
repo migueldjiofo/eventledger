@@ -249,31 +249,39 @@ function App() {
   }
 
   function openEditForm(event) {
-    setEditingEvent(event);
-    setForm({
-      name: event.name || "",
-      date: event.date || "",
-      location: event.location || "",
-      organizer: event.organizer || "",
-      paypalLink: event.paypalLink || "",
-      revolutLink: event.revolutLink || "",
-      bankOwner: event.bankOwner || "",
-      iban: event.iban || "",
-      bic: event.bic || "",
-      bankReason: event.bankReason || "",
-    });
-    setShowForm(true);
-  }
+  setEditingEvent(event);
+  setForm({
+    name: event.name || "",
+    date: event.date || "",
+    location: event.location || "",
+    organizer: event.organizer || "",
+    paypalLink: event.paypalLink || "",
+    revolutLink: event.revolutLink || "",
+    bankOwner: event.bankOwner || "",
+    iban: event.iban || "",
+    bic: event.bic || "",
+    bankReason: event.bankReason || "",
+  });
+  setShowForm(true);
+}
 
   async function saveEvent(e) {
   e.preventDefault();
 
   if (editingEvent) {
-    const updatedEvent = {
-      ...editingEvent,
-      ...form,
-      updatedAt: new Date().toISOString(),
-    };
+    const { data, error } = await supabase
+      .from("events")
+      .update(form)
+      .eq("id", editingEvent.id)
+      .select();
+
+    if (error) {
+      console.error("Erreur modification Supabase:", error);
+      alert(error.message);
+      return;
+    }
+
+    const updatedEvent = data[0];
 
     setEvents((prev) =>
       prev.map((event) =>
@@ -291,10 +299,10 @@ function App() {
       .select();
 
     if (error) {
-	  console.error("Erreur Supabase:", error);
-	  alert(error.message);
-	  return;
-	}
+      console.error("Erreur création Supabase:", error);
+      alert(error.message);
+      return;
+    }
 
     const newEvent = data[0];
 
@@ -311,29 +319,40 @@ function App() {
   setShowForm(false);
 }
 
-  function deleteEvent(eventId) {
-    const confirmed = window.confirm(
-      "Voulez-vous vraiment supprimer cet événement ? Cette action supprimera aussi ses paiements et dépenses associés."
-    );
+  async function deleteEvent(eventId) {
+  const confirmed = window.confirm(
+    "Voulez-vous vraiment supprimer cet événement ? Cette action supprimera aussi ses paiements et dépenses associés."
+  );
 
-    if (!confirmed) return;
+  if (!confirmed) return;
 
-    setEvents((prev) => prev.filter((event) => event.id !== eventId));
-    setPayments((prev) => prev.filter((payment) => payment.eventId !== eventId));
-    setExpenses((prev) => prev.filter((expense) => expense.eventId !== eventId));
+  const { error } = await supabase
+    .from("events")
+    .delete()
+    .eq("id", eventId);
 
-    setCashData((prev) => {
-      const copy = { ...prev };
-      delete copy[eventId];
-      return copy;
-    });
-
-    if (selectedEvent?.id === eventId) {
-      setSelectedEvent(null);
-    }
-
-    setShowQR(false);
+  if (error) {
+    console.error("Erreur suppression Supabase:", error);
+    alert(error.message);
+    return;
   }
+
+  setEvents((prev) => prev.filter((event) => event.id !== eventId));
+  setPayments((prev) => prev.filter((payment) => payment.eventId !== eventId));
+  setExpenses((prev) => prev.filter((expense) => expense.eventId !== eventId));
+
+  setCashData((prev) => {
+    const copy = { ...prev };
+    delete copy[eventId];
+    return copy;
+  });
+
+  if (selectedEvent?.id === eventId) {
+    setSelectedEvent(null);
+  }
+
+  setShowQR(false);
+}
 
   function getFinalAmount() {
     return Number(customAmount || amount);
