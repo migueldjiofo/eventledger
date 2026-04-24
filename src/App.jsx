@@ -441,40 +441,50 @@ function App() {
     return value;
   }
 
-  function registerPayment() {
-    if (!selectedEvent) return;
+  async function registerPayment() {
+  if (!selectedEvent) return;
 
-    const value = getFinalAmount();
+  const value = getFinalAmount();
 
-    if (!value || value <= 0) {
-      alert("Veuillez entrer un montant valide.");
-      return;
-    }
-
-    const confirmed = window.confirm(
-      `Confirmer que le paiement de ${formatEuro(value)} via ${getMethodLabel(
-        method
-      )} a bien été reçu ?`
-    );
-
-    if (!confirmed) return;
-
-    const newPayment = {
-      id: Date.now(),
-      eventId: selectedEvent.id,
-      amount: value,
-      method,
-      confirmedByUser: true,
-      createdAt: new Date().toISOString(),
-    };
-
-    setPayments((prev) => [newPayment, ...prev]);
-    setShowQR(false);
+  if (!value || value <= 0) {
+    alert("Veuillez entrer un montant valide.");
+    return;
   }
+
+  const confirmed = window.confirm(
+    `Confirmer que le paiement de ${formatEuro(value)} via ${getMethodLabel(
+      method
+    )} a bien été reçu ?`
+  );
+
+  if (!confirmed) return;
+
+  const payload = {
+    event_id: selectedEvent.id,
+    amount: value,
+    method,
+  };
+
+  const { data, error } = await supabase
+    .from("payments")
+    .insert([payload])
+    .select();
+
+  if (error) {
+    console.error("Erreur paiement Supabase:", error);
+    alert(error.message);
+    return;
+  }
+
+  const newPayment = data[0];
+
+  setPayments((prev) => [newPayment, ...prev]);
+  setShowQR(false);
+}
 
   function getEventPayments(eventId) {
-    return payments.filter((payment) => payment.eventId === eventId);
-  }
+  return payments.filter((payment) => payment.event_id === eventId);
+}
 
   function getTotalByMethod(eventId, paymentMethod) {
     return getEventPayments(eventId)
@@ -931,7 +941,7 @@ function App() {
                         </div>
 
                         <p className="text-sm text-slate-500">
-                          {new Date(payment.createdAt).toLocaleTimeString(
+                          {new Date(payment.created_at).toLocaleTimeString(
                             "de-DE",
                             {
                               hour: "2-digit",
