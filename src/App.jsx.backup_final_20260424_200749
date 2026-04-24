@@ -338,8 +338,8 @@ function App() {
   }
 
   setEvents((prev) => prev.filter((event) => event.id !== eventId));
-  setPayments((prev) => prev.filter((payment) => payment.event_id !== eventId));
-  setExpenses((prev) => prev.filter((expense) => expense.event_id !== eventId));
+  setPayments((prev) => prev.filter((payment) => payment.eventId !== eventId));
+  setExpenses((prev) => prev.filter((expense) => expense.eventId !== eventId));
 
   setCashData((prev) => {
     const copy = { ...prev };
@@ -521,7 +521,7 @@ function App() {
     return Math.max(getCashEnd(eventId) - getCashStart(eventId), 0);
   }
 
-  async function addExpense(e) {
+  function addExpense(e) {
     e.preventDefault();
 
     if (!selectedEvent) return;
@@ -529,30 +529,19 @@ function App() {
     const value = Number(expenseForm.amount);
 
     if (!value || value <= 0) {
-      alert("Veuillez entrer un montant de dÃ©pense valide.");
+      alert("Veuillez entrer un montant de dépense valide.");
       return;
     }
 
-    const payload = {
-      event_id: selectedEvent.id,
+    const newExpense = {
+      id: Date.now(),
+      eventId: selectedEvent.id,
       category: expenseForm.category,
       detail: expenseForm.detail,
       amount: value,
       paid: expenseForm.paid,
+      createdAt: new Date().toISOString(),
     };
-
-    const { data, error } = await supabase
-      .from("expenses")
-      .insert([payload])
-      .select();
-
-    if (error) {
-      console.error("Erreur dÃ©pense Supabase:", error);
-      alert(error.message);
-      return;
-    }
-
-    const newExpense = data[0];
 
     setExpenses((prev) => [newExpense, ...prev]);
 
@@ -564,26 +553,15 @@ function App() {
     });
   }
 
-  async function deleteExpense(expenseId) {
-    const confirmed = window.confirm("Supprimer cette dÃ©pense ?");
+  function deleteExpense(expenseId) {
+    const confirmed = window.confirm("Supprimer cette dépense ?");
     if (!confirmed) return;
-
-    const { error } = await supabase
-      .from("expenses")
-      .delete()
-      .eq("id", expenseId);
-
-    if (error) {
-      console.error("Erreur suppression dÃ©pense Supabase:", error);
-      alert(error.message);
-      return;
-    }
 
     setExpenses((prev) => prev.filter((expense) => expense.id !== expenseId));
   }
 
   function getEventExpenses(eventId) {
-    return expenses.filter((expense) => expense.event_id === eventId);
+    return expenses.filter((expense) => expense.eventId === eventId);
   }
 
   function getTotalExpenses(eventId) {
@@ -1429,7 +1407,6 @@ function Info({ label, value }) {
 }
 
 export default App;
-
 
 
 
