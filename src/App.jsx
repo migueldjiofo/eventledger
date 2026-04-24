@@ -1,5 +1,6 @@
 ﻿import { useEffect, useState } from "react";
 import { QRCodeSVG } from "qrcode.react";
+import { supabase } from "./lib/supabase";
 import {
   Plus,
   CalendarDays,
@@ -211,24 +212,20 @@ function App() {
   const t = translations[language] || translations.fr;
 
   useEffect(() => {
-    try {
-      const savedEvents = localStorage.getItem("eventledger_events");
-      const savedPayments = localStorage.getItem("eventledger_payments");
-      const savedExpenses = localStorage.getItem("eventledger_expenses");
-      const savedCashData = localStorage.getItem("eventledger_cashData");
-	  const savedLanguage = localStorage.getItem("eventledger_language");
+  async function loadData() {
+    const { data: eventsData } = await supabase.from("events").select("*");
+    const { data: paymentsData } = await supabase.from("payments").select("*");
+    const { data: expensesData } = await supabase.from("expenses").select("*");
 
-      if (savedEvents) setEvents(JSON.parse(savedEvents));
-      if (savedPayments) setPayments(JSON.parse(savedPayments));
-      if (savedExpenses) setExpenses(JSON.parse(savedExpenses));
-      if (savedCashData) setCashData(JSON.parse(savedCashData));
-	  if (savedLanguage) setLanguage(savedLanguage);
-    } catch (error) {
-      console.error("Erreur chargement localStorage:", error);
-    } finally {
-      setIsLoaded(true);
-    }
-  }, []);
+    if (eventsData) setEvents(eventsData);
+    if (paymentsData) setPayments(paymentsData);
+    if (expensesData) setExpenses(expensesData);
+
+    setIsLoaded(true);
+  }
+
+  loadData();
+}, []);
   
 
   useEffect(() => {
@@ -268,43 +265,51 @@ function App() {
     setShowForm(true);
   }
 
-  function saveEvent(e) {
-    e.preventDefault();
+  async function saveEvent(e) {
+  e.preventDefault();
 
-    if (editingEvent) {
-      const updatedEvent = {
-        ...editingEvent,
-        ...form,
-        updatedAt: new Date().toISOString(),
-      };
+  if (editingEvent) {
+    const updatedEvent = {
+      ...editingEvent,
+      ...form,
+      updatedAt: new Date().toISOString(),
+    };
 
-      setEvents((prev) =>
-        prev.map((event) =>
-          event.id === editingEvent.id ? updatedEvent : event
-        )
-      );
+    setEvents((prev) =>
+      prev.map((event) =>
+        event.id === editingEvent.id ? updatedEvent : event
+      )
+    );
 
-      if (selectedEvent?.id === editingEvent.id) {
-        setSelectedEvent(updatedEvent);
-      }
-    } else {
-      const newEvent = {
-        id: Date.now(),
-        ...form,
-        createdAt: new Date().toISOString(),
-      };
-
-      setEvents((prev) => [newEvent, ...prev]);
-      setCashData((prev) => ({
-        ...prev,
-        [newEvent.id]: { startCash: "", endCash: "" },
-      }));
+    if (selectedEvent?.id === editingEvent.id) {
+      setSelectedEvent(updatedEvent);
     }
+  } else {
+    const { data, error } = await supabase
+      .from("events")
+      .insert([form])
+      .select();
 
-    setForm(emptyForm);
-    setEditingEvent(null);
-    setShowForm(false);
+    if (error) {
+	  console.error("Erreur Supabase:", error);
+	  alert(error.message);
+	  return;
+	}
+
+    const newEvent = data[0];
+
+    setEvents((prev) => [newEvent, ...prev]);
+
+    setCashData((prev) => ({
+      ...prev,
+      [newEvent.id]: { startCash: "", endCash: "" },
+    }));
   }
+
+  setForm(emptyForm);
+  setEditingEvent(null);
+  setShowForm(false);
+}
 
   function deleteEvent(eventId) {
     const confirmed = window.confirm(
@@ -1134,7 +1139,7 @@ function EventForm({ form, updateForm, saveEvent, close, editing, t }) {
           required
           value={form.name}
           onChange={(e) => updateForm("name", e.target.value)}
-          placeholder="Nom de l’événement"
+          placeholder={t.eventName}
           className="rounded-2xl border border-slate-200 px-4 py-3 outline-none focus:border-sky-400"
         />
 
